@@ -18,6 +18,8 @@ export default function SettingsPage() {
     const [showAddProxy, setShowAddProxy] = useState(false);
     const [activeSection, setActiveSection] = useState<'general' | 'proxies' | 'providers' | 'notifications' | 'logs'>('general');
     const [useSystemProxy, setUseSystemProxy] = useState(true);
+    const [autoFetchProxies, setAutoFetchProxies] = useState(false);
+    const [proxyCountry, setProxyCountry] = useState('');
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
     const [checkingNotifications, setCheckingNotifications] = useState(false);
     const [isValidating, setIsValidating] = useState(false);
@@ -34,6 +36,12 @@ export default function SettingsPage() {
             const res = await fetch('/api/settings');
             const data = await res.json();
             if (data.settings) {
+                if (data.settings.autoFetchProxies !== undefined) {
+                    setAutoFetchProxies(data.settings.autoFetchProxies === 'true');
+                }
+                if (data.settings.proxyCountry !== undefined) {
+                    setProxyCountry(data.settings.proxyCountry || '');
+                }
                 if (data.settings.useSystemProxy !== undefined) {
                     setUseSystemProxy(data.settings.useSystemProxy === 'true');
                 }
@@ -76,6 +84,8 @@ export default function SettingsPage() {
         try {
             const res = await fetch('/api/proxies/fetch', {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ country: proxyCountry }),
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
@@ -430,6 +440,45 @@ export default function SettingsPage() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
+                                            {/* Auto-Fetch free proxy pool from Proxifly */}
+                                            <div className="flex items-center justify-between py-3 border-t border-white/5 mt-3">
+                                                <div className="pr-4">
+                                                    <p className="text-sm text-white/90">Auto-Fetch Proxy Pool</p>
+                                                    <p className="text-xs text-white/40 mt-0.5">
+                                                        Refresh the pool from the Proxifly public list before each scheduled scan.
+                                                        Free proxies are shared and often blocked by Google - use paid residential for reliable data.
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        const newValue = !autoFetchProxies;
+                                                        setAutoFetchProxies(newValue);
+                                                        persistSetting('autoFetchProxies', String(newValue));
+                                                    }}
+                                                    className={`w-10 h-5 rounded-full relative transition-all shrink-0 ${autoFetchProxies ? 'bg-emerald-500' : 'bg-gray-600'}`}
+                                                >
+                                                    <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${autoFetchProxies ? 'right-1' : 'left-1'}`} />
+                                                </button>
+                                            </div>
+
+                                            {autoFetchProxies && (
+                                                <div className="pb-3">
+                                                    <label className="text-xs text-white/50 block mb-1">Restrict to country (optional)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={proxyCountry}
+                                                        onChange={(e) => setProxyCountry(e.target.value.toUpperCase().slice(0, 2))}
+                                                        onBlur={() => persistSetting('proxyCountry', proxyCountry)}
+                                                        placeholder="US"
+                                                        maxLength={2}
+                                                        className="w-24 bg-black/30 border border-white/10 rounded px-2 py-1 text-sm text-white/90 focus:outline-none focus:border-emerald-500/50"
+                                                    />
+                                                    <p className="text-xs text-white/40 mt-1">
+                                                        2-letter code. Leave blank to import from all countries.
+                                                    </p>
+                                                </div>
+                                            )}
+
                                             {useSystemProxy && (
                                                 <tr className="bg-blue-50/30">
                                                     <td className="px-6 py-4">
