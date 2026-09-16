@@ -14,6 +14,17 @@ import {
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
+// ── CARTO basemap tiles ──
+// The key is read from the environment so it is never committed to source.
+// Put it in .env.local as NEXT_PUBLIC_CARTO_API_KEY (see .env.example).
+// When no key is set we fall back to CARTO's keyless public endpoint, so the
+// map keeps working in local dev without any configuration.
+const CARTO_BASE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY;
+const CARTO_TILE_URL = CARTO_API_KEY
+    ? `${CARTO_BASE_URL}?api_key=${CARTO_API_KEY}`
+    : CARTO_BASE_URL;
+
 // Fix for default marker icon
 // @ts-ignore
 delete L.Icon.Default.prototype._getIconUrl;
@@ -261,7 +272,7 @@ export default function LeafletMap({
 
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                    url={CARTO_TILE_URL}
                 />
                 <MapUpdater center={center} zoom={zoom} />
 
