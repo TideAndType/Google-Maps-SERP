@@ -59,6 +59,7 @@ function getRegionalSettings(lat: number, lng: number) {
 export async function runScan(scanId: string) {
     let browser: Browser | null = null;
     let currentProxyId: string | null = null;
+    const usedProxyIds = new Set<string>();
     let scan: Scan | null = null;
 
     try {
@@ -140,11 +141,31 @@ export async function runScan(scanId: string) {
                     const activeOnes = availableProxies.filter((p: any) => p.status === 'ACTIVE');
                     const pool = activeOnes.length > 0 ? activeOnes : availableProxies;
 
-                    const p = pool[Math.floor(Math.random() * pool.length)];
+                    // Prefer proxies not yet used in this scan so a 49-point grid
+                    // spreads across the pool instead of hammering one IP.
+                    const unused = pool.filter((x: any) => !usedProxyIds.has(x.id));
+                    const chooseFrom = unused.length > 0 ? unused : pool;
+                    if (unused.length === 0) usedProxyIds.clear();
+
+                    const p = chooseFrom[Math.floor(Math.random() * chooseFrom.length)];
                     currentProxyId = p.id;
+                    usedProxyIds.add(p.id);
+
+                    // Scheme-aware: honour socks5/http(s) instead of assuming http.
+                    // Accepts a `protocol` column if present, or a host already carrying a scheme.
+                    const rawHost: string = String(p.host || '');
+                    const declared: string = String((p as any).protocol || '').toLowerCase();
+                    let server: string;
+                    if (rawHost.includes('://')) {
+                        server = `${rawHost}:${p.port}`;
+                    } else if (declared) {
+                        server = `${declared}://${rawHost}:${p.port}`;
+                    } else {
+                        server = `http://${rawHost}:${p.port}`;
+                    }
 
                     launchOptions.proxy = {
-                        server: `http://${p.host}:${p.port}`,
+                        server,
                         username: p.username || undefined,
                         password: p.password || undefined,
                     };
@@ -236,6 +257,13 @@ export async function runScan(scanId: string) {
 
         browser = await launchBrowser();
 
+        // ═══ PROXY ROTATION ═══
+        // The browser (and therefore the exit IP) used to be launched once for the
+        // whole grid, so every point hit Google from the same address. Relaunch
+        // periodically so the scan spreads across the proxy pool.
+        let pointsSinceLaunch = 0;
+        const ROTATE_EVERY_N_POINTS = 5;
+
         // ═══ CIRCUIT BREAKER ═══
         // Tracks consecutive failures. If too many in a row, pause to let Google cool down.
         let consecutiveFailures = 0;
@@ -243,6 +271,20 @@ export async function runScan(scanId: string) {
         const CIRCUIT_BREAKER_PAUSE_MS = 60_000; // 60 second cooldown
 
         for (const point of remainingPoints) {
+            // Rotate the exit IP every few points (proxy mode only).
+            if (!useSystemProxy && pointsSinceLaunch >= ROTATE_EVERY_N_POINTS) {
+                try {
+                    await logger.debug(`[ProxyRotation] Rotating exit IP after ${pointsSinceLaunch} points.`, 'SCANNER', { scanId });
+                    await browser.close().catch(() => { });
+                    browser = await launchBrowser();
+                    pointsSinceLaunch = 0;
+                } catch (rotErr: any) {
+                    await logger.warn(`[ProxyRotation] Rotation failed (${rotErr?.message}); continuing on current connection.`, 'SCANNER');
+                    pointsSinceLaunch = 0;
+                }
+            }
+            pointsSinceLaunch++;
+
             // Check if scan has been stopped or reset
             const currentScan = await prisma.scan.findUnique({
                 where: { id: scanId },
