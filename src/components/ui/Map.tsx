@@ -13,39 +13,8 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { useCartoTileUrl } from '@/lib/useCartoTileUrl';
 
-// ── CARTO basemap tiles ──
-// The key is read from the environment so it is never committed to source.
-// Put it in .env.local as NEXT_PUBLIC_CARTO_API_KEY (see .env.example).
-// When no key is set we fall back to CARTO's keyless public endpoint, so the
-// map keeps working in local dev without any configuration.
-const CARTO_BASE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-// Build-time fallback only. The runtime key from Settings > Providers wins.
-const CARTO_ENV_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY || '';
-
-/**
- * Resolves the CARTO basemap key, preferring the value saved in
- * Settings > Providers (GlobalSetting.cartoApiKey) so it can be rotated at
- * runtime with no rebuild. Falls back to NEXT_PUBLIC_CARTO_API_KEY, then to
- * CARTO's keyless public endpoint.
- */
-function useCartoTileUrl(): string {
-    const [key, setKey] = useState<string>(CARTO_ENV_KEY);
-
-    useEffect(() => {
-        let cancelled = false;
-        fetch('/api/settings')
-            .then(res => res.json())
-            .then(data => {
-                const saved = String(data?.settings?.cartoApiKey || '').trim();
-                if (!cancelled && saved) setKey(saved);
-            })
-            .catch(() => { /* keep fallback */ });
-        return () => { cancelled = true; };
-    }, []);
-
-return CARTO_BASE_URL;
-}
 
 // Fix for default marker icon
 // @ts-ignore
