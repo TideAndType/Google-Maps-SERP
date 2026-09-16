@@ -111,6 +111,14 @@ export async function runScan(scanId: string) {
         const proxySetting = await prisma.globalSetting.findUnique({ where: { key: 'useSystemProxy' } });
         const useSystemProxy = proxySetting ? proxySetting.value === 'true' : true;
 
+        // If the Auto-Fetch toggle is on and the pool has run dry, top it up
+        // before the first browser launch. Never throws - a failed refresh
+        // just leaves the existing pool in place.
+        if (!useSystemProxy) {
+            const { maybeRefreshProxyPool } = await import('./proxyRefresh');
+            await maybeRefreshProxyPool();
+        }
+
         async function launchBrowser(failedProxyId?: string): Promise<Browser> {
             await logger.debug('Launching browser...', 'SCANNER', { failedProxyId });
 
