@@ -28,6 +28,12 @@ export async function POST() {
         let allProxies: string[] = [];
         const logs: string[] = [];
 
+        // Be honest about what this feature is: free, public, shared proxy lists.
+        // Typically 90-95% are dead at any moment, and the survivors are widely
+        // abused so Google often blocks or degrades them.
+        logs.push('[NOTICE] Source: free public proxy lists. Expect ~90% to test DEAD - this is normal.');
+        logs.push('[NOTICE] Free proxies are frequently blocked by Google. For reliable scans use Direct Connection or paid residential proxies.');
+
         for (const source of sources) {
             try {
                 logger.info(`Fetching from ${source.name}: ${source.url}`, 'PROXY_FETCHER');
