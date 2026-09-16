@@ -5,6 +5,7 @@ import { Browser, BrowserContext, Page } from 'playwright-core';
 import { chromium, getElectronLaunchDefaults } from './browser';
 import { logger } from './logger';
 import { dispatchWebhook } from './webhookDispatcher';
+import { resolveTargetRank, logMatchMiss } from './rankMatch';
 import type { Scan } from '@prisma/client';
 
 /**
@@ -53,44 +54,6 @@ function getRegionalSettings(lat: number, lng: number) {
     }
 
     return { locale, timezoneId };
-}
-
-/**
- * Normalize a business name for accurate matching.
- * Strips common suffixes, punctuation, and extra whitespace.
- */
-function normalizeBusinessName(name: string): string {
-    return name
-        .toLowerCase()
-        .replace(/[''`]/g, "'")  // Normalize quotes
-        .replace(/[^a-z0-9'\s]/g, ' ')  // Strip punctuation except apostrophes
-        .replace(/\b(llc|inc|corp|ltd|co|the|and|of)\b/g, '')  // Remove common suffixes/articles
-        .replace(/\s+/g, ' ')  // Collapse whitespace
-        .trim();
-}
-
-/**
- * Check if two business names match, using normalized comparison.
- * STRICT: Only exact match, or full containment with minimum length guard.
- * This prevents "Cash" from matching "Cash For Cars" etc.
- */
-function businessNamesMatch(scanName: string, resultName: string): boolean {
-    const normScan = normalizeBusinessName(scanName);
-    const normResult = normalizeBusinessName(resultName);
-
-    if (!normScan || !normResult) return false;
-
-    // Exact match after normalization
-    if (normScan === normResult) return true;
-
-    // Containment check with minimum length guard:
-    // Only allow if the shorter string is at least 10 chars to prevent false positives
-    const shorter = normScan.length < normResult.length ? normScan : normResult;
-    const longer = normScan.length < normResult.length ? normResult : normScan;
-
-    if (shorter.length >= 10 && longer.includes(shorter)) return true;
-
-    return false;
 }
 
 export async function runScan(scanId: string) {
@@ -387,73 +350,42 @@ export async function runScan(scanId: string) {
                 continue;
             }
 
-            let rank = null;
-            let targetName = null;
-            let matchMethod = 'none';
-
-            // ── PRIORITY 1: Match by CID (decimal string — most reliable) ──
-            if (scan.placeId) {
-                // Check if scan.placeId is a CID (all digits) or a ChIJ placeId
-                const isCID = /^\d+$/.test(scan.placeId);
-                const isChIJ = scan.placeId.startsWith('ChIJ');
-
-                let match = null;
-
-                if (isCID) {
-                    // Match by CID directly
-                    match = results.find(r => r.cid === scan.placeId);
-                    if (match) matchMethod = 'CID';
-                }
-
-                if (!match && isChIJ) {
-                    // Match by ChIJ Place ID
-                    match = results.find(r => r.placeId === scan.placeId);
-                    if (match) matchMethod = 'PlaceID';
-                }
-
-                if (!match) {
-                    // Cross-check: placeId might be stored as CID, result might have it as placeId or vice versa
-                    match = results.find(r =>
-                        (r.cid && r.cid === scan.placeId) ||
-                        (r.placeId && r.placeId === scan.placeId)
-                    );
-                    if (match) matchMethod = 'CrossID';
-                }
-
-                if (match) {
-                    rank = match.rank;
-                    targetName = match.name;
-                    // Auto-fill business name if not set
-                    if (!scan.businessName) {
-                        await prisma.scan.update({
-                            where: { id: scan.id },
-                            data: { businessName: match.name }
-                        });
-                    }
-                }
-            }
-
-            // ── PRIORITY 2: Strict name matching (only if no ID match) ──
-            if (rank === null && scan.businessName) {
-                const match = results.find(r => businessNamesMatch(scan.businessName!, r.name));
-                if (match) {
-                    rank = match.rank;
-                    targetName = match.name;
-                    matchMethod = 'Name';
-
-                    // If we got a name match, save the CID for future accurate matching
-                    if (match.cid && !scan.placeId) {
-                        await prisma.scan.update({
-                            where: { id: scan.id },
-                            data: { placeId: match.cid }
-                        });
-                        await logger.info(`[Matching] Auto-saved CID ${match.cid} for scan ${scan.id} from name match`, 'SCANNER');
-                    }
-                }
-            }
+            // ── Resolve the target business's rank for this grid point ──
+            const matched = resolveTargetRank(
+                { businessName: scan.businessName, placeId: scan.placeId },
+                results
+            );
+            const { rank, targetName, matchMethod } = matched;
 
             if (rank !== null) {
-                await logger.debug(`[Matching] Point ${point.lat},${point.lng}: Rank ${rank} via ${matchMethod} ("${targetName}")`, 'SCANNER');
+                await logger.debug(
+                    `[Matching] Point ${point.lat},${point.lng}: Rank ${rank} via ${matchMethod} ("${targetName}")`,
+                    'SCANNER'
+                );
+
+                // Backfill identity so subsequent runs use reliable ID matching
+                if (matchMethod === 'Name' && matched.cid && !scan.placeId) {
+                    await prisma.scan.update({
+                        where: { id: scan.id },
+                        data: { placeId: matched.cid }
+                    });
+                    await logger.info(`[Matching] Auto-saved CID ${matched.cid} for scan ${scan.id} from name match`, 'SCANNER');
+                }
+                if (!scan.businessName && targetName) {
+                    await prisma.scan.update({
+                        where: { id: scan.id },
+                        data: { businessName: targetName }
+                    });
+                }
+            } else {
+                // Log WHY there is no rank — distinguishes a config gap from a real miss
+                await logMatchMiss(
+                    scan.id,
+                    point,
+                    { businessName: scan.businessName, placeId: scan.placeId },
+                    results,
+                    matchMethod
+                );
             }
 
             await prisma.result.create({
@@ -466,8 +398,8 @@ export async function runScan(scanId: string) {
                     topResults: JSON.stringify(results),
                     rank,
                     targetName,
-                    placeId: rank ? (results.find(r => r.rank === rank)?.placeId) : null,
-                    cid: rank ? (results.find(r => r.rank === rank)?.cid) : null
+                    placeId: matched.placeId,
+                    cid: matched.cid
                 },
             });
             await logger.debug(`Captured point ${point.lat},${point.lng}. Target Rank: ${rank || 'N/A'} (${results.length} results)`, 'SCANNER');
