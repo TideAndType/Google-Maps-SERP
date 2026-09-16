@@ -3,6 +3,10 @@ import Link from 'next/link';
 import { BarChart3, Download, TrendingUp, Calendar, MapPin, Search } from 'lucide-react';
 import { Card, Button, Badge } from '@/components/ui';
 
+// Always read live DB state. Without this, Next.js statically prerenders
+// this page at build time and it would show stale/empty data forever.
+export const dynamic = 'force-dynamic';
+
 export default async function ReportsPage() {
     const reports = await prisma.scan.findMany({
         where: { status: 'COMPLETED' },
