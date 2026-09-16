@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Settings as SettingsIcon, User, Bell, Database, Github, Plus, Trash2, CheckCircle2, Globe, Server, Shield, Zap, Info, Loader2, X, AlertCircle, Activity } from 'lucide-react';
 import { Card, Button, Input, Select, Badge } from '@/components/ui';
 import { Telemetry } from '@/components/settings/Telemetry';
+import { MapProviderSettings } from '@/components/settings/MapProviderSettings';
+
 
 export default function SettingsPage() {
     const [name, setName] = useState('Local User');
@@ -496,6 +498,7 @@ export default function SettingsPage() {
 
                 {activeSection === 'providers' && (
                     <div className="space-y-8 animate-in fade-in duration-300">
+                        <MapProviderSettings />
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {[
                                 { name: 'Bright Data', icon: Zap, iconBg: 'bg-blue-50', iconColor: 'text-blue-600', border: 'hover:ring-blue-500/30' },
