@@ -55,8 +55,20 @@ export function getAppDir(): string {
   return path.resolve(__dirname, '..');
 }
 
-/** Playwright browsers directory in userData */
+/**
+ * Playwright browsers directory.
+ *
+ * Packaged builds ship Chromium inside app resources (`playwright-browsers/`,
+ * populated at build time), so there is no runtime download. We prefer that
+ * bundled copy when present; otherwise (dev, or a build without bundled
+ * browsers) we fall back to a writable userData dir that the runtime
+ * downloader can populate.
+ */
 export function getPlaywrightBrowsersPath(): string {
+  if (isPackaged()) {
+    const bundled = path.join(process.resourcesPath, 'playwright-browsers');
+    if (fs.existsSync(bundled)) return bundled;
+  }
   return path.join(getUserDataDir(), 'playwright-browsers');
 }
 

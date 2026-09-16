@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.6] - 2026-09-16
+
+### Bug Fixes
+
+Definitive fix for the "Executable doesn't exist" / "Script failed to execute" crash that persisted in 1.9.5.
+
+#### Fixed
+- **Chromium now bundled with the app (no runtime download)** — 1.9.5 tried to download Playwright's Chromium on first launch, but in a packaged app the `playwright-core` install CLI is pruned by Next.js standalone tracing and a scan can start before the ~150 MB download finishes, so the browser was frequently missing and scans crashed with `browserType.launch: Executable doesn't exist at .../chrome-headless-shell`. The build now downloads `chromium` + `chromium-headless-shell` at build time (per target OS/arch) and ships them inside app resources; `getPlaywrightBrowsersPath()` points Playwright at the bundled copy in packaged builds. The runtime downloader remains only as a dev/fallback path.
+
+---
+
 ## [1.9.5] - 2026-09-16
 
 ### Bug Fixes
