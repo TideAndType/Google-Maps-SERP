@@ -483,8 +483,10 @@ function applyContentSecurityPolicy(port: number): void {
     `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${localOrigin}`,
     `style-src 'self' 'unsafe-inline' ${localOrigin}`,
     `font-src 'self' data: ${localOrigin}`,
-    // Map tiles (OpenStreetMap) and data URIs for Leaflet markers
-    `img-src 'self' data: blob: ${localOrigin} https://*.tile.openstreetmap.org https://*.openstreetmap.org`,
+    // Map tiles and data URIs for Leaflet markers.
+    //  - *.tile.openstreetmap.org / *.openstreetmap.org: OSM raster tiles
+    //  - *.basemaps.cartocdn.com: CARTO "voyager" basemap tiles (default in Map/MiniMap)
+    `img-src 'self' data: blob: ${localOrigin} https://*.tile.openstreetmap.org https://*.openstreetmap.org https://*.basemaps.cartocdn.com`,
     // External APIs this app uses:
     //  - nominatim: address geocoding
     //  - overpass-api: smart grid neighborhood lookup
