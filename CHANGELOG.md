@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.5] - 2026-09-16
+
+### Bug Fixes
+
+Resolves the two most-reported crash classes (`spawn EINVAL`, "Executable doesn't exist") and the blank-map bug from v1.9.4.
+
+#### Fixed
+- **`spawn EINVAL` crash on Windows** — The Playwright browser installer shelled out to `npx.cmd`, which throws `spawn EINVAL` under Node ≥20 (which refuses to spawn `.cmd`/`.bat` files without an explicit shell) and isn't present in a packaged app at all. The installer now runs the bundled `playwright-core` CLI directly via the Electron binary in Node mode (`ELECTRON_RUN_AS_NODE=1`), the same mechanism used to launch the embedded server. Fixes reported crashes on startup after the server became ready.
+- **"Executable doesn't exist" / "Script failed to execute" crash** — Two causes: (1) browsers never downloaded because the `npx` invocation above failed silently, and (2) the executable-path lookup only recognized the full-Chromium layout, so it returned nothing even after a successful install. The lookup now also detects the `chromium_headless_shell-*` layout that `headless: true` launches use, and the installer downloads both `chromium` and `chromium-headless-shell`.
+- **Blank/gray maps (CSP blocks CARTO tiles)** — The injected Content Security Policy's `img-src` directive omitted the CARTO tile domain used by the Map and MiniMap components. Added `https://*.basemaps.cartocdn.com` so basemap tiles load inside the Electron renderer.
+
+---
+
 ## [1.9.4] - 2026-03-22
 
 ### Crash Reporting
