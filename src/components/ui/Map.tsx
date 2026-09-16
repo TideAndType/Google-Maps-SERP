@@ -44,7 +44,7 @@ function useCartoTileUrl(): string {
         return () => { cancelled = true; };
     }, []);
 
-    return key ? `${CARTO_BASE_URL}?api_key=${encodeURIComponent(key)}` : CARTO_BASE_URL;
+return CARTO_BASE_URL;
 }
 
 // Fix for default marker icon
