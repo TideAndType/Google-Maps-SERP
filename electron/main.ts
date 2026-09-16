@@ -617,13 +617,28 @@ app.on('will-quit', () => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function updateSplashStatus(message: string): void {
-  try {
-    if (splashWindow && !splashWindow.isDestroyed()) {
-      splashWindow.webContents.executeJavaScript(
-        `document.getElementById('status').textContent = '${message.replace(/'/g, "\\'")}'`
-      );
-    }
-  } catch { /* splash may be gone */ }
+  if (!splashWindow || splashWindow.isDestroyed()) return;
+
+  // Escape backslashes first, then single quotes, for safe embedding.
+  const safe = message.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  // Guard the element inside the injected script so it never throws even if
+  // the DOM isn't ready yet, and swallow the promise rejection — executeJavaScript
+  // returns a Promise, so a renderer-side throw here would otherwise surface as
+  // an unhandledRejection ("Script failed to execute") and be logged as a crash.
+  const run = () => {
+    if (!splashWindow || splashWindow.isDestroyed()) return;
+    splashWindow.webContents
+      .executeJavaScript(`{ const el = document.getElementById('status'); if (el) { el.textContent = '${safe}'; } }`)
+      .catch(() => { /* splash not ready or already closed — non-fatal */ });
+  };
+
+  // If the splash page is still loading, getElementById would return null;
+  // wait for the DOM before injecting.
+  if (splashWindow.webContents.isLoadingMainFrame()) {
+    splashWindow.webContents.once('did-finish-load', run);
+  } else {
+    run();
+  }
 }
 
 function closeSplash(): void {

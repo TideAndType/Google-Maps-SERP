@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.7] - 2026-09-16
+
+### Bug Fixes
+
+Stops the false "Script failed to execute" crash reports and makes local builds bundle Chromium.
+
+#### Fixed
+- **False "Script failed to execute" crash reports** — `updateSplashStatus()` called `webContents.executeJavaScript()` (which returns a Promise) inside a plain `try/catch`, which cannot catch an async rejection. At startup the status updates run before the splash DOM has loaded, so `document.getElementById('status')` was `null`, the injected script threw, and the rejection surfaced as an `unhandledRejection` — "Script failed to execute, this normally means an error was thrown" — which the crash reporter logged and re-offered on next launch, even though the app kept running. The injected script now guards the element, waits for `did-finish-load`, and the promise rejection is caught. This eliminates the spurious crash reports behind the recurring `[Crash] Script failed to execute` issues.
+- **Local builds now bundle Chromium too** — added `scripts/bundle-playwright.js`, run by every `electron:build*` npm script (and mirrored in CI), so a local `npm run electron:build:mac` produces an app with Chromium bundled — not just CI builds.
+
+---
+
 ## [1.9.6] - 2026-09-16
 
 ### Bug Fixes

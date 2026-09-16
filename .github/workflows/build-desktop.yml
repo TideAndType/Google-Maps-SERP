@@ -69,9 +69,7 @@ jobs:
         run: node -e "require('fs').mkdirSync('data/postal',{recursive:true})"
 
       - name: Download Playwright Chromium for bundling
-        run: npx playwright install chromium chromium-headless-shell
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/ms-playwright
+        run: node scripts/bundle-playwright.js
 
       - name: Build Electron app (macOS)
         if: matrix.platform == 'mac'
