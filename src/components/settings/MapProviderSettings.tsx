@@ -1,102 +1,119 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Map as MapIcon, Check, Loader2, Eye, EyeOff } from 'lucide-react';
-import { Card, Button, Input } from '@/components/ui';
+import { BASEMAPS, DEFAULT_BASEMAP, type BasemapStyle } from '@/lib/useCartoTileUrl';
 
-/**
- * Map provider credentials, stored in GlobalSetting via /api/settings.
- *
- * The CARTO basemap key is intentionally NOT read from NEXT_PUBLIC_* here:
- * env vars are inlined at build time, which is wrong for a desktop app the
- * user installs as a binary. Storing it in the DB lets the key be changed
- * and rotated at runtime with no rebuild.
- */
+const STYLE_OPTIONS: { value: BasemapStyle; label: string; hint: string }[] = [
+    { value: 'voyager', label: 'Voyager', hint: 'Balanced colour basemap (default)' },
+    { value: 'light', label: 'Light', hint: 'Muted — rank pins stand out most' },
+    { value: 'dark', label: 'Dark', hint: 'Dark basemap for low-light use' },
+    { value: 'osm', label: 'OpenStreetMap', hint: 'Classic OSM styling' },
+];
+
 export function MapProviderSettings() {
-    const [cartoKey, setCartoKey] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [saved, setSaved] = useState(false);
-    const [reveal, setReveal] = useState(false);
+    const [style, setStyle] = useState<BasemapStyle>(DEFAULT_BASEMAP);
+    const [status, setStatus] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('loading');
 
     useEffect(() => {
+        let cancelled = false;
         fetch('/api/settings')
             .then(res => res.json())
-            .then(data => setCartoKey(data.settings?.cartoApiKey || ''))
-            .catch(err => console.error('Failed to load map settings:', err))
-            .finally(() => setLoading(false));
+            .then(data => {
+                if (cancelled) return;
+                const saved = String(data?.settings?.mapBasemap || '').trim().toLowerCase();
+                if (saved in BASEMAPS) setStyle(saved as BasemapStyle);
+                setStatus('idle');
+            })
+            .catch(() => {
+                if (!cancelled) setStatus('idle');
+            });
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
-    const handleSave = async () => {
-        setSaving(true);
-        setSaved(false);
+    async function save(next: BasemapStyle) {
+        setStyle(next);
+        setStatus('saving');
         try {
-            await fetch('/api/settings', {
+            const res = await fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: 'cartoApiKey', value: cartoKey.trim() }),
+                body: JSON.stringify({ key: 'mapBasemap', value: next }),
             });
-            setSaved(true);
-            setTimeout(() => setSaved(false), 2500);
-        } catch (err) {
-            console.error('Failed to save CARTO key:', err);
-        } finally {
-            setSaving(false);
+            if (!res.ok) throw new Error('save failed');
+            setStatus('saved');
+            setTimeout(() => setStatus('idle'), 2000);
+        } catch {
+            setStatus('error');
         }
-    };
+    }
 
     return (
-        <Card className="p-8 border-none shadow-xl ring-1 ring-gray-200 bg-white">
-            <div className="w-14 h-14 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center mb-6 shadow-sm">
-                <MapIcon size={28} />
-            </div>
-
-            <h3 className="text-xl font-black text-gray-900 mb-2">CARTO Basemap</h3>
-            <p className="text-sm text-gray-500 font-medium mb-6 leading-relaxed">
-                Optional. Leave blank to use CARTO&apos;s free keyless tiles, which are rate limited
-                and may drop out under heavy scanning. Adding a key raises those limits.
-            </p>
-
-            <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
-                API Key
-            </label>
-
-            <div className="relative mb-4">
-                <Input
-                    type={reveal ? 'text' : 'password'}
-                    value={cartoKey}
-                    onChange={(e) => setCartoKey(e.target.value)}
-                    placeholder={loading ? 'Loading...' : 'cb1_...'}
-                    disabled={loading}
-                    className="pr-12 font-mono text-sm"
-                    autoComplete="off"
-                    spellCheck={false}
-                />
-                <button
-                    type="button"
-                    onClick={() => setReveal(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                    aria-label={reveal ? 'Hide API key' : 'Show API key'}
-                >
-                    {reveal ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-            </div>
-
-            <div className="flex items-center gap-3">
-                <Button onClick={handleSave} disabled={loading || saving}>
-                    {saving ? <Loader2 size={16} className="animate-spin" /> : 'Save Key'}
-                </Button>
-                {saved && (
-                    <span className="flex items-center gap-1.5 text-sm font-bold text-green-600">
-                        <Check size={16} /> Saved
+        <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                        Map Basemap
+                    </h3>
+                    <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                        Basemap tiles for the Spatial View. No API key or account is required —
+                        all styles use free public endpoints.
+                    </p>
+                </div>
+                {status === 'saved' && (
+                    <span className="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                        Saved
+                    </span>
+                )}
+                {status === 'saving' && (
+                    <span className="shrink-0 text-xs text-neutral-400">Saving…</span>
+                )}
+                {status === 'error' && (
+                    <span className="shrink-0 text-xs font-medium text-red-600 dark:text-red-400">
+                        Save failed
                     </span>
                 )}
             </div>
 
-            <p className="text-xs text-gray-400 font-medium mt-5 leading-relaxed">
-                Stored locally in your own database. Reload the Spatial View after saving for
-                new tiles to be requested.
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {STYLE_OPTIONS.map(opt => {
+                    const active = style === opt.value;
+                    return (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => save(opt.value)}
+                            className={[
+                                'text-left rounded-lg border px-4 py-3 transition-colors',
+                                active
+                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
+                                    : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600',
+                            ].join(' ')}
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                                    {opt.label}
+                                </span>
+                                {active && (
+                                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                                        Active
+                                    </span>
+                                )}
+                            </div>
+                            <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                                {opt.hint}
+                            </p>
+                        </button>
+                    );
+                })}
+            </div>
+
+            <p className="mt-4 text-xs text-neutral-400 dark:text-neutral-500">
+                Note: CARTO platform tokens (<code>cb1_…</code>) are not basemap credentials.
+                Supplying one causes CARTO to return &ldquo;API Key Required&rdquo; placeholder
+                tiles, so no key field is offered here.
             </p>
-        </Card>
+        </div>
     );
 }
