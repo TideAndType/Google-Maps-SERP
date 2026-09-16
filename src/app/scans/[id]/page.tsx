@@ -45,6 +45,7 @@ interface Scan {
     centerLat: number;
     centerLng: number;
     businessName?: string;
+    placeId?: string;
     customPoints?: string; // JSON string
     results: Result[];
 }
@@ -536,7 +537,7 @@ export default function ScanReportPage({ params }: { params: Promise<{ id: strin
                                 <MapComponent
                                     center={[scan.centerLat, scan.centerLng]}
                                     zoom={13}
-                                    points={scan.results.map(r => ({ ...r, hasData: true })) || []}
+                                    points={scan.results.map(r => ({ ...r, hasData: true, hasTarget: Boolean(scan.businessName || scan.placeId) })) || []}
                                     gridSize={scan.gridSize}
                                     onPointClick={(point) => setSelectedPoint(point as unknown as Result)}
                                     showHeatmap={showHeatmap}
