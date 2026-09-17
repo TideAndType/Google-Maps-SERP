@@ -6,6 +6,7 @@ import { Settings as SettingsIcon, User, Bell, Database, Github, Plus, Trash2, C
 import { Card, Button, Input, Select, Badge } from '@/components/ui';
 import { Telemetry } from '@/components/settings/Telemetry';
 import { MapProviderSettings } from '@/components/settings/MapProviderSettings';
+import { ClearCacheButton } from '@/components/settings/ClearCacheButton';
 
 
 export default function SettingsPage() {
@@ -548,6 +549,7 @@ export default function SettingsPage() {
                 {activeSection === 'providers' && (
                     <div className="space-y-8 animate-in fade-in duration-300">
                         <MapProviderSettings />
+                        <ClearCacheButton />
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {[
                                 { name: 'Bright Data', icon: Zap, iconBg: 'bg-blue-50', iconColor: 'text-blue-600', border: 'hover:ring-blue-500/30' },
