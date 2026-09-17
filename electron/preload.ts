@@ -31,4 +31,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Utility
   getLogPath: () => ipcRenderer.invoke('get-log-path'),
   getDataPath: () => ipcRenderer.invoke('get-data-path'),
+
+  // Maintenance
+  clearCache: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('clear-cache'),
 });
