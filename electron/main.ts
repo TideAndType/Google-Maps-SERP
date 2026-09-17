@@ -461,6 +461,33 @@ function backupDatabase(): void {
 function registerUtilityHandlers(): void {
   ipcMain.handle('get-log-path', () => LOG_DIR);
   ipcMain.handle('get-data-path', () => getUserDataDir());
+
+/**
+ * Clear the Electron HTTP cache and web storage, then reload the window.
+ *
+ * Needed because map tiles are ordinary images: if a basemap host ever served
+ * an error placeholder (e.g. an "API Key Required" tile), Electron caches it
+ * like any other valid PNG and keeps showing it after the underlying bug is
+ * fixed. This gives the user an in-app way to flush that without deleting
+ * ~/Library/Application Support by hand.
+ *
+ * Deliberately does NOT touch the SQLite database, scan history, or settings —
+ * those live in the user-data dir as files, not in the browser cache.
+ */
+ipcMain.handle('clear-cache', async () => {
+  try {
+    await session.defaultSession.clearCache();
+    await session.defaultSession.clearStorageData({
+      storages: ['cachestorage', 'shadercache', 'serviceworkers'],
+    });
+    log('INFO', 'Cache cleared via in-app button; reloading window.');
+    mainWindow?.webContents.reload();
+    return { ok: true };
+  } catch (err) {
+    log('ERROR', `Failed to clear cache: ${String(err)}`);
+    return { ok: false, error: String(err) };
+  }
+});
 }
 
 /**
