@@ -1,5 +1,7 @@
 import { randomBytes, timingSafeEqual } from 'crypto';
+import fs from 'fs';
 import { prisma } from './prisma';
+import { chromium, getElectronLaunchDefaults } from './browser';
 import { getQueueStatus } from './scanQueue';
 
 const KEY_SETTING = 'tideorbitBridgeKey';
@@ -48,11 +50,21 @@ export async function authorizeTideOrbit(req: Request): Promise<boolean> {
 }
 
 export function bridgeHealth() {
+  let browserReady = false;
+  try {
+    const configured = getElectronLaunchDefaults().executablePath;
+    const executable = configured || chromium.executablePath();
+    browserReady = Boolean(executable && fs.existsSync(executable));
+  } catch {
+    browserReady = false;
+  }
+
   return {
     ok: true,
     service: 'tideorbit-browser-bridge',
     protocol: 1,
     scanner: 'Google-Maps-SERP',
+    browserReady,
     queue: getQueueStatus(),
     timestamp: new Date().toISOString(),
   };
