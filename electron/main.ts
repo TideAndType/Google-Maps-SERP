@@ -14,6 +14,7 @@ import { setupDatabase } from './db-setup';
 import { initUpdater, registerVersionHandlers } from './updater';
 import { ensurePlaywrightBrowser, setPlaywrightEnvVars } from './playwright-setup';
 import { writeCrashReport, checkAndReportPreviousCrash } from './crash-reporter';
+import { startTideOrbitBridge, stopTideOrbitBridge, updateTideOrbitBridgeTarget, TIDEORBIT_BRIDGE_PORT } from './tideorbit-bridge';
 
 // ─── File Logger ──────────────────────────────────────────────────────────
 // Writes logs to userData/logs/ for crash diagnostics
@@ -356,6 +357,7 @@ async function startNextServer(): Promise<number> {
           startNextServer()
             .then((newPort) => {
               serverPort = newPort;
+              updateTideOrbitBridgeTarget(newPort);
               serverRestartCount = 0; // reset on successful restart
               mainWindow?.loadURL(`http://127.0.0.1:${serverPort}`).catch((err) => {
                 log('ERROR', 'Failed to reload window after server restart:', err.message);
@@ -568,6 +570,11 @@ app.whenReady().then(async () => {
     serverPort = await startNextServer();
     log('INFO', `Server ready on port ${serverPort}`);
 
+    // Expose only the authenticated TideOrbit bridge endpoints on a stable
+    // localhost port. Point cloudflared at this port, never at the full UI.
+    await startTideOrbitBridge(serverPort, log);
+    log('INFO', `TideOrbit tunnel bridge ready on 127.0.0.1:${TIDEORBIT_BRIDGE_PORT}`);
+
     // Apply Content Security Policy now that we know the server port
     applyContentSecurityPolicy(serverPort);
 
@@ -639,6 +646,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  stopTideOrbitBridge();
   killServer();
 });
 
