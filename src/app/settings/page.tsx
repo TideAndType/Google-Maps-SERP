@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Settings as SettingsIcon, User, Bell, Database, Github, Plus, Trash2, CheckCircle2, Globe, Server, Shield, Zap, Info, Loader2, X, AlertCircle, Activity } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Database, Github, Plus, Trash2, CheckCircle2, Globe, Server, Shield, Zap, Info, Loader2, X, AlertCircle, Activity, Copy, RefreshCw, KeyRound } from 'lucide-react';
 import { Card, Button, Input, Select, Badge } from '@/components/ui';
 import { Telemetry } from '@/components/settings/Telemetry';
 import { MapProviderSettings } from '@/components/settings/MapProviderSettings';
@@ -17,20 +17,56 @@ export default function SettingsPage() {
     const [showLogs, setShowLogs] = useState(false);
     const [newProxy, setNewProxy] = useState({ host: '', port: '', username: '', password: '', type: 'RESIDENTIAL' });
     const [showAddProxy, setShowAddProxy] = useState(false);
-    const [activeSection, setActiveSection] = useState<'general' | 'proxies' | 'providers' | 'notifications' | 'logs'>('general');
+    const [activeSection, setActiveSection] = useState<'general' | 'proxies' | 'providers' | 'notifications' | 'tideorbit' | 'logs'>('general');
     const [useSystemProxy, setUseSystemProxy] = useState(true);
     const [autoFetchProxies, setAutoFetchProxies] = useState(false);
     const [proxyCountry, setProxyCountry] = useState('');
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
     const [checkingNotifications, setCheckingNotifications] = useState(false);
     const [isValidating, setIsValidating] = useState(false);
+    const [bridgeKey, setBridgeKey] = useState('');
+    const [bridgeLoading, setBridgeLoading] = useState(false);
+    const [bridgeCopied, setBridgeCopied] = useState(false);
 
     useEffect(() => {
         const savedName = localStorage.getItem('gbpranktracker_user_name');
         if (savedName) setName(savedName);
         fetchProxies();
         fetchSettings();
+        fetchBridgeKey();
     }, []);
+
+    const fetchBridgeKey = async () => {
+        try {
+            const res = await fetch('/api/tideorbit/key');
+            if (!res.ok) return;
+            const data = await res.json();
+            setBridgeKey(data.key || '');
+        } catch (err) {
+            console.error('Failed to fetch TideOrbit bridge key:', err);
+        }
+    };
+
+    const regenerateBridgeKey = async () => {
+        if (!confirm('Regenerate the TideOrbit pairing key? Existing TideOrbit connections will stop working until you paste the new key into WordPress.')) return;
+        setBridgeLoading(true);
+        try {
+            const res = await fetch('/api/tideorbit/key', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) setBridgeKey(data.key || '');
+        } catch (err) {
+            console.error('Failed to regenerate TideOrbit bridge key:', err);
+        } finally {
+            setBridgeLoading(false);
+        }
+    };
+
+    const copyBridgeKey = async () => {
+        if (!bridgeKey) return;
+        await navigator.clipboard.writeText(bridgeKey);
+        setBridgeCopied(true);
+        setTimeout(() => setBridgeCopied(false), 1500);
+    };
 
     const fetchSettings = async () => {
         try {
@@ -233,7 +269,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-gray-500 font-bold ml-1 uppercase tracking-widest opacity-70">Infrastructure & Spatial Routing Control</p>
                 </div>
                 <div className="flex gap-2 p-1.5 bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto custom-scrollbar">
-                    {['general', 'proxies', 'providers', 'notifications', 'logs'].map((tab) => (
+                    {['general', 'proxies', 'providers', 'notifications', 'tideorbit', 'logs'].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveSection(tab as any)}
@@ -300,6 +336,59 @@ export default function SettingsPage() {
                                         <p className="text-xs text-gray-500">Never delete old scan records.</p>
                                     </div>
                                     <input type="checkbox" className="w-6 h-6 rounded-lg border-gray-200 text-blue-600 focus:ring-blue-500" />
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                )}
+
+                {activeSection === 'tideorbit' && (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                        <Card className="p-8 border-none shadow-xl ring-1 ring-gray-200 bg-white">
+                            <div className="flex items-start justify-between gap-6 mb-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                        <KeyRound size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-gray-900">TideOrbit Browser Bridge</h3>
+                                        <p className="text-sm text-gray-500 font-medium">Connect this scanner to TideOrbit through your Cloudflare Tunnel.</p>
+                                    </div>
+                                </div>
+                                <Badge variant="outline" className="font-black text-[10px] border-emerald-500/20 text-emerald-600 bg-emerald-50">BRIDGE READY</Badge>
+                            </div>
+
+                            <div className="space-y-5">
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-[2px] text-gray-400 mb-2 block">Pairing Key</label>
+                                    <div className="flex gap-2">
+                                        <Input value={bridgeKey} readOnly type="password" className="font-mono bg-gray-50 border-gray-200" />
+                                        <Button onClick={copyBridgeKey} variant="outline" className="shrink-0 font-black">
+                                            <Copy size={16} className="mr-2" /> {bridgeCopied ? 'Copied' : 'Copy'}
+                                        </Button>
+                                        <Button onClick={regenerateBridgeKey} disabled={bridgeLoading} variant="outline" className="shrink-0 font-black text-rose-600">
+                                            {bridgeLoading ? <Loader2 size={16} className="animate-spin mr-2" /> : <RefreshCw size={16} className="mr-2" />}
+                                            Regenerate
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-2">
+                                    <p className="text-sm font-black text-indigo-900">Cloudflare Tunnel setup</p>
+                                    <p className="text-xs font-medium text-indigo-700 leading-relaxed">
+                                        Point your Cloudflare Tunnel at http://127.0.0.1:4317, then paste the public HTTPS tunnel URL and this pairing key into TideOrbit → Opportunities → Growth Lab.
+                                        Port 4317 exposes only the authenticated TideOrbit bridge routes, not this dashboard or the scanner's other APIs. The key itself can only be viewed or regenerated from the local scanner app.
+                                    </p>
+                                </div>
+
+                                <div className="p-4 bg-slate-950 text-slate-100 rounded-xl font-mono text-xs">
+                                    cloudflared tunnel --url http://127.0.0.1:4317
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                                    <div className="p-4 rounded-xl bg-gray-50 border border-gray-100"><strong className="block text-gray-900 mb-1">Health</strong><code>/api/tideorbit/health</code></div>
+                                    <div className="p-4 rounded-xl bg-gray-50 border border-gray-100"><strong className="block text-gray-900 mb-1">Create scan</strong><code>/api/tideorbit/scans</code></div>
+                                    <div className="p-4 rounded-xl bg-gray-50 border border-gray-100"><strong className="block text-gray-900 mb-1">Read scan</strong><code>/api/tideorbit/scans/&lt;id&gt;</code></div>
                                 </div>
                             </div>
                         </Card>

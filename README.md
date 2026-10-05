@@ -41,7 +41,7 @@ Google Maps rankings are **hyperlocal**. A business might rank #1 when someone s
 
 Every grid point captures the full top-20 SERP — complete competitive intelligence, not just your own position.
 
-**100% private. 100% free. No API keys. No subscriptions. No data leaves your machine.**
+**Private by default. 100% free. No third-party SERP API required. Scan data stays on your machine unless you explicitly enable an integration such as the optional TideOrbit Browser Bridge.**
 
 ---
 
@@ -98,6 +98,24 @@ The app creates virtual search points across your service area, performs real Go
 | Rank Grid Map | Review Analysis | Intelligence Dashboard |
 |:---:|:---:|:---:|
 | Geographic ranking heatmap | AI sentiment & fake review detection | HHI, Share of Voice, threat scores |
+
+---
+
+## TideOrbit Browser Bridge (Optional)
+
+The desktop app can act as TideOrbit's local Chromium worker. It starts a **localhost-only bridge on port 4317** that exposes only authenticated TideOrbit health, scan-create, and scan-result routes. The rest of the dashboard and local APIs are not proxied through this bridge.
+
+1. Open **Settings → TideOrbit** in the desktop app and copy the generated pairing key.
+2. Start a Cloudflare tunnel that points only to the bridge:
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:4317
+```
+
+3. In WordPress open **TideOrbit → Opportunities → Growth Lab**, choose **Automatic: Browser → DataForSEO**, paste the public HTTPS tunnel URL and pairing key, then click **Test Browser Bridge**.
+4. Local Grid scans will run in this app's Playwright/Chromium queue. If the tunnel is offline and TideOrbit has DataForSEO configured, Automatic mode falls back without changing the user's workflow.
+
+The pairing key is randomly generated and stored locally. It can only be viewed or regenerated from the app loaded on localhost, is excluded from the generic settings API, and every public bridge request must provide it.
 
 ---
 
