@@ -572,8 +572,14 @@ app.whenReady().then(async () => {
 
     // Expose only the authenticated TideOrbit bridge endpoints on a stable
     // localhost port. Point cloudflared at this port, never at the full UI.
-    await startTideOrbitBridge(serverPort, log);
-    log('INFO', `TideOrbit tunnel bridge ready on 127.0.0.1:${TIDEORBIT_BRIDGE_PORT}`);
+    try {
+      await startTideOrbitBridge(serverPort, log);
+      log('INFO', `TideOrbit tunnel bridge ready on 127.0.0.1:${TIDEORBIT_BRIDGE_PORT}`);
+    } catch (bridgeErr: any) {
+      // The rank tracker itself remains usable even if the optional TideOrbit
+      // bridge cannot bind (for example because port 4317 is already occupied).
+      log('ERROR', 'TideOrbit bridge unavailable:', bridgeErr?.message || String(bridgeErr));
+    }
 
     // Apply Content Security Policy now that we know the server port
     applyContentSecurityPolicy(serverPort);
