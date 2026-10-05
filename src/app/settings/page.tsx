@@ -376,9 +376,13 @@ export default function SettingsPage() {
                                 <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-2">
                                     <p className="text-sm font-black text-indigo-900">Cloudflare Tunnel setup</p>
                                     <p className="text-xs font-medium text-indigo-700 leading-relaxed">
-                                        Point your Cloudflare Tunnel at this app's local Next.js address, then paste the public HTTPS tunnel URL and this pairing key into TideOrbit → Opportunities → Growth Lab.
-                                        The public bridge endpoints require this key; the key itself can only be viewed or regenerated from the local scanner app.
+                                        Point your Cloudflare Tunnel at http://127.0.0.1:4317, then paste the public HTTPS tunnel URL and this pairing key into TideOrbit → Opportunities → Growth Lab.
+                                        Port 4317 exposes only the authenticated TideOrbit bridge routes, not this dashboard or the scanner's other APIs. The key itself can only be viewed or regenerated from the local scanner app.
                                     </p>
+                                </div>
+
+                                <div className="p-4 bg-slate-950 text-slate-100 rounded-xl font-mono text-xs">
+                                    cloudflared tunnel --url http://127.0.0.1:4317
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
