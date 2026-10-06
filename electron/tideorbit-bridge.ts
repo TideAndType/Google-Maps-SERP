@@ -8,6 +8,7 @@ let targetPort = 3000;
 
 function isAllowedPath(pathname: string): boolean {
   return pathname === '/api/tideorbit/health'
+    || pathname === '/api/tideorbit/geocode'
     || pathname === '/api/tideorbit/scans'
     || /^\/api\/tideorbit\/scans\/[A-Za-z0-9_-]+$/.test(pathname);
 }
