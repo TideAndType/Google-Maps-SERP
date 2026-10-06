@@ -1,10 +1,5 @@
 name: Build macOS DMG (artifact)
 
-# Manually-triggered build that produces the macOS .dmg on a macOS runner and
-# uploads it as a downloadable workflow artifact. Unlike build-desktop.yml this
-# does NOT publish to a GitHub release, so it works from a fork without needing
-# publish permissions on the upstream repository.
-
 on:
   workflow_dispatch:
   push:
@@ -16,7 +11,18 @@ permissions:
 
 jobs:
   build-mac:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            arch: x64
+            artifact: GBP-Rank-Tracker-macOS-Intel
+          - runner: macos-latest
+            arch: arm64
+            artifact: GBP-Rank-Tracker-macOS-Apple-Silicon
+
+    runs-on: ${{ matrix.runner }}
 
     env:
       NODE_OPTIONS: '--max-old-space-size=4096'
@@ -66,17 +72,21 @@ jobs:
       - name: Download Playwright Chromium for bundling
         run: node scripts/bundle-playwright.js
 
-      - name: Build Electron DMG (macOS, no publish)
-        run: npx electron-builder --mac --publish never
+      - name: Build Electron DMG
+        run: npx electron-builder --mac --${{ matrix.arch }} --publish never
         env:
-          # Ad-hoc sign with "-" identity — no Apple account needed.
-          # Prevents "app is damaged" Gatekeeper error on macOS 13+.
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Rename DMG by architecture
+        run: |
+          DMG=$(find dist-electron -maxdepth 1 -name '*.dmg' -print -quit)
+          test -n "$DMG"
+          cp "$DMG" "dist-electron/GBP-Rank-Tracker-1.9.8-${{ matrix.arch }}.dmg"
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GBP-Rank-Tracker-macOS-dmg
-          path: dist-electron/*.dmg
+          name: ${{ matrix.artifact }}
+          path: dist-electron/GBP-Rank-Tracker-1.9.8-${{ matrix.arch }}.dmg
           if-no-files-found: error
           retention-days: 14
