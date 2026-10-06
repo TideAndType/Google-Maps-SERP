@@ -81,12 +81,12 @@ jobs:
         run: |
           DMG=$(find dist-electron -maxdepth 1 -name '*.dmg' -print -quit)
           test -n "$DMG"
-          cp "$DMG" "dist-electron/GBP-Rank-Tracker-1.9.8-${{ matrix.arch }}.dmg"
+          cp "$DMG" "dist-electron/GBP-Rank-Tracker-${{ matrix.arch }}.dmg"
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: dist-electron/GBP-Rank-Tracker-1.9.8-${{ matrix.arch }}.dmg
+          path: dist-electron/GBP-Rank-Tracker-${{ matrix.arch }}.dmg
           if-no-files-found: error
           retention-days: 14
